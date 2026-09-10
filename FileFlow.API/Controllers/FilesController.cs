@@ -3,9 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using FileFlow.API.Data;
 using FileFlow.API.Models;
 using FileFlow.API.DTOs;
+using Microsoft.AspNetCore.Builder;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using System.Data.SqlTypes;
 
 namespace FileFlow.API.Controllers;
 
@@ -15,9 +17,18 @@ public class FilesController : ControllerBase
 {
     private readonly FileFlowDbContext _context;
 
-    public FilesController(FileFlowDbContext context)
+    // Physical location of storage folder on disk
+    private readonly string _storagePath;
+
+    public FilesController(FileFlowDbContext context, IWebHostEnvironment env)
     {
         _context = context;
+        _storagePath = Path.Combine(env.ContentRootPath, "Storage");
+
+        if (!Directory.Exists(_storagePath))
+        {
+            Directory.CreateDirectory(_storagePath);
+        }
     }
 
     // GET /api/files
@@ -59,7 +70,24 @@ public class FilesController : ControllerBase
 
         // Temporary user ID since authentication isn't set up yet
         int mockUserId = 1;
-        string generatedStoragePath = Path.GetRandomFileName();
+
+        // Use random unique name because user file name may include characters like ../ that break the path
+        string randomName = Path.GetFileNameWithoutExtension(Path.GetRandomFileName()); // Gets "hfgfwctf"
+
+        // Keep extension like png/jpg
+        string extension = Path.GetExtension(filePayload.FileName);
+
+        string generatedStoragePath = randomName + extension; // Combines them into "hfgfwctf.jpg"
+
+
+        // Path where the physical bytes will be
+        string fullDiskPath = Path.Combine(_storagePath, generatedStoragePath);
+
+        // Write the file to disk
+        using (var stream = new FileStream(fullDiskPath, FileMode.Create))
+        {
+            await filePayload.CopyToAsync(stream);
+        }
 
         // Construct new file from payload
         var fileItem = new FileItem(
@@ -89,8 +117,14 @@ public class FilesController : ControllerBase
             return NotFound();
         }
 
-        // Temp returning data details
-        return Ok(new { Message = "Ready to download", Path = file.StoredFileName });
+        var fullDiskPath = Path.Combine(_storagePath, file.StoredFileName);
+
+        if (!System.IO.File.Exists(fullDiskPath))
+        {
+            return NotFound();
+        }
+
+        return PhysicalFile(Path.GetFullPath(fullDiskPath), file.ContentType, file.Name);
     }
 
     // DELETE /api/files/{id}
@@ -103,6 +137,13 @@ public class FilesController : ControllerBase
         if (file == null)
         {
             return NotFound();
+        }
+
+        string fullDiskPath = Path.Combine(_storagePath, file.StoredFileName);
+
+        if (System.IO.File.Exists(fullDiskPath))
+        {
+            System.IO.File.Delete(fullDiskPath);
         }
 
         _context.FileItems.Remove(file);
