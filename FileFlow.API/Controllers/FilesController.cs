@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using FileFlow.API.Data;
 using FileFlow.API.Models;
 using FileFlow.API.DTOs;
+using FileFlow.API.Services;
 using Microsoft.AspNetCore.Builder;
 using System.Collections.Generic;
 using System.IO;
@@ -20,9 +21,13 @@ public class FilesController : ControllerBase
     // Physical location of storage folder on disk
     private readonly string _storagePath;
 
-    public FilesController(FileFlowDbContext context, IWebHostEnvironment env)
+    // Turns a FolderId into a real folder path
+    private readonly FolderPathResolver _pathResolver;
+
+    public FilesController(FileFlowDbContext context, IWebHostEnvironment env, FolderPathResolver pathResolver)
     {
         _context = context;
+        _pathResolver = pathResolver;
         _storagePath = Path.Combine(env.ContentRootPath, "Storage");
 
         if (!Directory.Exists(_storagePath))
@@ -77,8 +82,22 @@ public class FilesController : ControllerBase
         // Keep extension like png/jpg
         string extension = Path.GetExtension(filePayload.FileName);
 
-        string generatedStoragePath = randomName + extension; // Combines them into "hfgfwctf.jpg"
+        string generatedFileName = randomName + extension; // Combines them into "hfgfwctf.jpg"
 
+        // Resolve which real on-disk subfolder this file belongs in,
+        // based on the folder tree (e.g. "Documents/School")
+        string relativeFolderPath = await _pathResolver.GetRelativePathAsync(request.FolderId);
+        string fullFolderPath = Path.Combine(_storagePath, relativeFolderPath);
+
+        // Make sure that folder actually exists on disk before writing into it
+        if (!Directory.Exists(fullFolderPath))
+        {
+            Directory.CreateDirectory(fullFolderPath);
+        }
+
+        // StoredFileName now holds the RELATIVE path (folder + filename)
+        // so download/delete can find the file later, wherever it lives
+        string generatedStoragePath = Path.Combine(relativeFolderPath, generatedFileName);
 
         // Path where the physical bytes will be
         string fullDiskPath = Path.Combine(_storagePath, generatedStoragePath);

@@ -10,7 +10,10 @@ namespace FileFlow.API.Models
         public int UserId { get; private set; }
         public DateTime CreatedAt { get; private set; }
 
-        private Folder() { }
+        private Folder(string name)
+        {
+            Name = name;
+        }
 
         public Folder(string name, int userId, int? parentFolderId = null)
         {
