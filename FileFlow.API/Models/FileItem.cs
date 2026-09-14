@@ -42,5 +42,13 @@ namespace FileFlow.API.Models
 
             Name = newName;
         }
+
+        public void UpdateStoredFileName(string newStoredFileName)
+        {
+            if (string.IsNullOrWhiteSpace(newStoredFileName))
+                throw new ArgumentException("File name cannot be empty.", nameof(newStoredFileName));
+
+            StoredFileName = newStoredFileName;
+        }
     }
 }

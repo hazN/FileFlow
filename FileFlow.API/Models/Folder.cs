@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 namespace FileFlow.API.Models
 {
@@ -10,15 +11,11 @@ namespace FileFlow.API.Models
         public int UserId { get; private set; }
         public DateTime CreatedAt { get; private set; }
 
-        private Folder(string name)
-        {
-            Name = name;
-        }
+        private Folder() { }
 
         public Folder(string name, int userId, int? parentFolderId = null)
         {
-            if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentException("Folder name cannot be empty.", nameof(name));
+            ValidateName(name);
 
             Name = name;
             UserId = userId;
@@ -28,8 +25,7 @@ namespace FileFlow.API.Models
 
         public void Rename(string newName)
         {
-            if (string.IsNullOrWhiteSpace(newName))
-                throw new ArgumentException("Folder name cannot be empty.", nameof(newName));
+            ValidateName(newName);
 
             Name = newName;
         }
@@ -40,6 +36,17 @@ namespace FileFlow.API.Models
                 throw new ArgumentException("A folder cannot be its own parent.", nameof(parentFolderId));
 
             ParentFolderId = parentFolderId;
+        }
+        private static void ValidateName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Folder name cannot be empty.", nameof(name));
+
+            if (name.Contains("..") || name.Contains('/') || name.Contains('\\'))
+                throw new ArgumentException("Folder name cannot contain path separators or '..'.", nameof(name));
+
+            if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                throw new ArgumentException("Folder name contains invalid characters.", nameof(name));
         }
     }
 }

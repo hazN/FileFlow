@@ -48,6 +48,36 @@ public class FilesController : ControllerBase
         return Ok(response);
     }
 
+    // GET /api/files/search?query=resume
+    // Search files by name 
+    [HttpGet("search")]
+    public async Task<ActionResult<IEnumerable<FileResponse>>> SearchFiles([FromQuery] string query,
+     [FromQuery] string? sort = null)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return BadRequest("Search cannot be empty.");
+        }
+
+        var filesQuery = _context.FileItems.Where(f => f.Name.Contains(query));
+
+        filesQuery = sort switch
+        {
+            "name_asc" => filesQuery.OrderBy(f => f.Name),
+            "name_desc" => filesQuery.OrderByDescending(f => f.Name),
+            "size_asc" => filesQuery.OrderBy(f => f.Size),
+            "size_desc" => filesQuery.OrderByDescending(f => f.Size),
+            "created_asc" => filesQuery.OrderBy(f => f.CreatedAt),
+            "created_desc" => filesQuery.OrderByDescending(f => f.CreatedAt),
+            _ => filesQuery
+        };
+
+        var files = await filesQuery.ToListAsync();
+        var response = files.Select(FileResponse.FromEntity).ToList();
+
+        return Ok(response);
+    }
+
     // GET /api/files/{id}
     // Finds a specific file by its ID
     [HttpGet("{id}")]
@@ -169,5 +199,45 @@ public class FilesController : ControllerBase
         await _context.SaveChangesAsync();
 
         return NoContent();
+    }
+
+    // PUT /api/files/{id}/move
+    // Moves a file to a different folder
+    [HttpPut("{id}/move")]
+    public async Task<ActionResult<FileResponse>> MoveFile(int id, [FromBody] FileMoveRequest request)
+    {
+        var file = await _context.FileItems.FindAsync(id);
+
+        if (file == null)
+        {
+            return NotFound();
+        }
+
+        string oldFullPath = Path.Combine(_storagePath, file.StoredFileName);
+
+        file.MoveToFolder(request.FolderId);
+
+        string newRelativeFolderPath = await _pathResolver.GetRelativePathAsync(request.FolderId);
+        string newFolderFullPath = Path.Combine(_storagePath, newRelativeFolderPath);
+
+        if (!Directory.Exists(newFolderFullPath))
+        {
+            Directory.CreateDirectory(newFolderFullPath);
+        }
+
+        string fileName = Path.GetFileName(file.StoredFileName);
+        string newStoredFileName = Path.Combine(newRelativeFolderPath, fileName);
+        string newFullPath = Path.Combine(_storagePath, newStoredFileName);
+
+        if (oldFullPath != newFullPath && System.IO.File.Exists(oldFullPath))
+        {
+            System.IO.File.Move(oldFullPath, newFullPath);
+        }
+
+        file.UpdateStoredFileName(newStoredFileName);
+
+        await _context.SaveChangesAsync();
+
+        return Ok(FileResponse.FromEntity(file));
     }
 }
