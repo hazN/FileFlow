@@ -13,6 +13,14 @@ builder.Services.AddDbContext<FileFlowDbContext>(options =>
 builder.Services.AddControllers();
 builder.Services.AddScoped<FolderPathResolver>();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactDev", policy =>
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyMethod()
+              .AllowAnyHeader());
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -25,6 +33,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 // Map incoming network requests to controller functions
+app.UseCors("AllowReactDev");
 app.MapControllers();
 
 app.Run();
