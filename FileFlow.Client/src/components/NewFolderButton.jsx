@@ -32,7 +32,7 @@ export default function NewFolderButton({ parentFolderId, onCreated }) {
                 placeholder="Folder name"
             />
             <button onClick={handleCreate}>Create</button>
-            <button onClick={() => setShowInput(false)}>Cancel</button>
+            <button className="btn-primary" onClick={() => setShowInput(true)}>+ New Folder</button>
         </span>
     );
 }

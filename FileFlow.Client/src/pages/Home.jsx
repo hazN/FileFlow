@@ -60,19 +60,20 @@ export default function Home() {
         }
     };
 
-    if (loading) return <p>Loading...</p>;
-    if (error) return <p>Error: {error}</p>;
+    if (loading) return <div className="app"><p>Loading...</p></div>;
+    if (error) return <div className="app"><p>Error: {error}</p></div>;
 
     return (
-        <div>
-            <h1>FileFlow</h1>
+        <div className="app">
+            <div className="app-header">
+                <h1>FileFlow</h1>
+            </div>
 
-            {/* Breadcrumb trail */}
-            <div>
+            <div className="breadcrumbs">
                 <button onClick={() => handleBreadcrumbClick(-1)}>Home</button>
                 {breadcrumbs.map((crumb, index) => (
-                    <span key={crumb.id}>
-                        {" / "}
+                    <span key={crumb.id} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <span className="separator">/</span>
                         <button onClick={() => handleBreadcrumbClick(index)}>
                             {crumb.name}
                         </button>
@@ -80,12 +81,12 @@ export default function Home() {
                 ))}
             </div>
 
-            <div>
+            <div className="toolbar">
                 <UploadButton folderId={currentFolderId} onUploaded={loadContents} />
                 <NewFolderButton parentFolderId={currentFolderId} onCreated={loadContents} />
             </div>
 
-            <h3>Folders</h3>
+            <div className="section-title">Folders</div>
             <FolderList
                 folders={folders}
                 onFolderClick={(id) => {
@@ -94,7 +95,7 @@ export default function Home() {
                 }}
             />
 
-            <h3>Files</h3>
+            <div className="section-title">Files</div>
             <FileList files={files} onFileDeleted={loadContents} />
         </div>
     );

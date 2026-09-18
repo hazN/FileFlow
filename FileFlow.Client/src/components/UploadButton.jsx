@@ -23,7 +23,7 @@ export default function UploadButton({ folderId, onUploaded }) {
                 style={{ display: "none" }}
                 onChange={handleFileSelected}
             />
-            <button onClick={() => inputRef.current.click()}>+ Upload File</button>
+            <button className="btn-primary" onClick={() => inputRef.current.click()}>+ Upload File</button>
         </>
     );
 }
