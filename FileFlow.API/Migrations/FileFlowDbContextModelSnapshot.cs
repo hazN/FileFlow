@@ -15,7 +15,7 @@ namespace FileFlow.API.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "8.0.30");
+            modelBuilder.HasAnnotation("ProductVersion", "8.0.31");
 
             modelBuilder.Entity("FileFlow.API.Models.FileItem", b =>
                 {
@@ -74,6 +74,28 @@ namespace FileFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Folders");
+                });
+
+            modelBuilder.Entity("FileFlow.API.Models.User", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Users");
                 });
 #pragma warning restore 612, 618
         }
