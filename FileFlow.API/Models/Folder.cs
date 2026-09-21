@@ -1,5 +1,5 @@
 using System;
-using System.IO;
+using FileFlow.API.Validation;
 
 namespace FileFlow.API.Models
 {
@@ -39,14 +39,8 @@ namespace FileFlow.API.Models
         }
         private static void ValidateName(string name)
         {
-            if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentException("Folder name cannot be empty.", nameof(name));
-
-            if (name.Contains("..") || name.Contains('/') || name.Contains('\\'))
-                throw new ArgumentException("Folder name cannot contain path separators or '..'.", nameof(name));
-
-            if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-                throw new ArgumentException("Folder name contains invalid characters.", nameof(name));
+            if (!FolderNameValidator.IsValid(name))
+                throw new ArgumentException("Folder name contains invalid characters or path traversal.", nameof(name));
         }
     }
 }
