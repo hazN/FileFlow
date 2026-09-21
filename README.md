@@ -1,2 +1,1 @@
-!\[CI](https://github.com/owner/repo/actions/workflows/ci.yml/badge.svg)
-
+[![CI](https://github.com/hazN/FileFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/hazN/FileFlow/actions/workflows/ci.yml)
