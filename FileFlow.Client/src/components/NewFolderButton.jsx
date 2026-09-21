@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFolder } from "../services/api";
 
-export default function NewFolderButton({ parentFolderId, onCreated }) {
+export default function NewFolderButton({ parentFolderId, onCreated, onUnauthorized }) {
     const [showInput, setShowInput] = useState(false);
     const [name, setName] = useState("");
 
@@ -14,6 +14,10 @@ export default function NewFolderButton({ parentFolderId, onCreated }) {
             setShowInput(false);
             onCreated(); // tells the parent to refresh
         } catch (err) {
+            if (err.message === "UNAUTHORIZED") {
+                onUnauthorized();
+                return;
+            }
             alert(err.message); // e.g. shows your backend's validation error
         }
     };

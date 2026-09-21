@@ -1,15 +1,23 @@
 import { useRef } from "react";
 import { uploadFile } from "../services/api";
 
-export default function UploadButton({ folderId, onUploaded }) {
+export default function UploadButton({ folderId, onUploaded, onUnauthorized }) {
     const inputRef = useRef(null);
 
     const handleFileSelected = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
 
-        await uploadFile(file, folderId);
-        onUploaded(); // tells the parent to refresh the list
+        try {
+            await uploadFile(file, folderId);
+            onUploaded(); // tells the parent to refresh the list
+        } catch (err) {
+            if (err.message === "UNAUTHORIZED") {
+                onUnauthorized();
+                return;
+            }
+            alert(err.message);
+        }
 
         // reset the input so selecting the same file again still fires onChange
         event.target.value = "";

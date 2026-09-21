@@ -1,14 +1,17 @@
 using FileFlow.API.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using FileFlow.API.DTOs;
 using FileFlow.API.Models;
 using FileFlow.API.Services;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace FileFlow.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class FoldersController : ControllerBase
     {
         private readonly FileFlowDbContext _context;
@@ -36,7 +39,10 @@ namespace FileFlow.API.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<FolderResponse>>> GetFolders()
         {
-            var folders = await _context.Folders.ToListAsync();
+            int userId = GetCurrentUserId();
+            var folders = await _context.Folders
+                .Where(folder => folder.UserId == userId)
+                .ToListAsync();
 
             var response = folders.Select(FolderResponse.FromFolder).ToList();
 
@@ -50,7 +56,7 @@ namespace FileFlow.API.Controllers
         {
             var folder = await _context.Folders.FindAsync(id);
 
-            if (folder == null)
+            if (folder == null || folder.UserId != GetCurrentUserId())
             {
                 return NotFound();
             }
@@ -67,13 +73,18 @@ namespace FileFlow.API.Controllers
         {
             var folder = await _context.Folders.FindAsync(id);
 
-            if (folder == null)
+            int userId = GetCurrentUserId();
+            if (folder == null || folder.UserId != userId)
             {
                 return NotFound();
             }
 
-            var subFolders = await _context.Folders.Where(f => f.ParentFolderId == id).ToListAsync();
-            var files = await _context.FileItems.Where(f => f.FolderId == id).ToListAsync();
+            var subFolders = await _context.Folders
+                .Where(f => f.ParentFolderId == id && f.UserId == userId)
+                .ToListAsync();
+            var files = await _context.FileItems
+                .Where(f => f.FolderId == id && f.UserId == userId)
+                .ToListAsync();
 
             return Ok(new
             {
@@ -88,13 +99,12 @@ namespace FileFlow.API.Controllers
         [HttpPost]
         public async Task<ActionResult<FolderResponse>> CreateFolder(FolderCreateRequest request)
         {
-            // temp user id until auth is implemented
-            int mockUserId = 1;
+            int userId = GetCurrentUserId();
 
             Folder folder;
             try
             {
-                folder = new Folder(request.Name, mockUserId, request.ParentFolderId);
+                folder = new Folder(request.Name, userId, request.ParentFolderId);
             }
             catch (Exception ex)
             {
@@ -124,7 +134,7 @@ namespace FileFlow.API.Controllers
         {
             var folder = await _context.Folders.FindAsync(id);
 
-            if (folder == null)
+            if (folder == null || folder.UserId != GetCurrentUserId())
             {
                 return NotFound();
             }
@@ -167,7 +177,7 @@ namespace FileFlow.API.Controllers
         {
             var folder = await _context.Folders.FindAsync(id);
 
-            if (folder == null)
+            if (folder == null || folder.UserId != GetCurrentUserId())
             {
                 return NotFound();
             }
@@ -194,6 +204,18 @@ namespace FileFlow.API.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        private int GetCurrentUserId()
+        {
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (userIdClaim == null)
+            {
+                throw new UnauthorizedAccessException("No user ID found in token.");
+            }
+
+            return int.Parse(userIdClaim);
         }
     }
 }

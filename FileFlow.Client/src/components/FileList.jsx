@@ -17,16 +17,32 @@ function formatSize(bytes) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function FileList({ files, onFileDeleted }) {
-    const handleDownload = (file, e) => {
+export default function FileList({ files, onFileDeleted, onUnauthorized }) {
+    const handleDownload = async (file, e) => {
         e.stopPropagation();
-        downloadFile(file.id, file.name);
+        try {
+            await downloadFile(file.id, file.name);
+        } catch (err) {
+            if (err.message === "UNAUTHORIZED") {
+                onUnauthorized();
+                return;
+            }
+            console.error(err);
+        }
     };
 
     const handleDelete = async (file, e) => {
         e.stopPropagation();
-        await deleteFile(file.id);
-        onFileDeleted();
+        try {
+            await deleteFile(file.id);
+            onFileDeleted();
+        } catch (err) {
+            if (err.message === "UNAUTHORIZED") {
+                onUnauthorized();
+                return;
+            }
+            console.error(err);
+        }
     };
 
     if (files.length === 0) {

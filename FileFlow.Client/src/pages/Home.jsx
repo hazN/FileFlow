@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { getFiles, getFolderContents, getRootFolders } from "../services/api";import FileList from "../components/FileList";
+import { getFiles, getFolderContents, getRootFolders } from "../services/api";
+import FileList from "../components/FileList";
 import FolderList from "../components/FolderList";
 import UploadButton from "../components/UploadButton";
 import NewFolderButton from "../components/NewFolderButton";
 
-export default function Home() {
+export default function Home({ currentEmail, onLogout }) {
     const [currentFolderId, setCurrentFolderId] = useState(null);
 
     const [breadcrumbs, setBreadcrumbs] = useState([]);
@@ -31,6 +32,10 @@ export default function Home() {
                 setFolders(data.subFolders ?? data.SubFolders ?? []);
             }
         } catch (err) {
+            if (err.message === "UNAUTHORIZED") {
+                onLogout();
+                return;
+            }
             console.error(err);
             setError(err.message);
         } finally {
@@ -67,6 +72,10 @@ export default function Home() {
         <div className="app">
             <div className="app-header">
                 <h1>FileFlow</h1>
+                <div>
+                    <span style={{ marginRight: "10px", fontSize: "13px", color: "#666" }}>{currentEmail}</span>
+                    <button onClick={onLogout}>Log out</button>
+                </div>
             </div>
 
             <div className="breadcrumbs">
@@ -82,8 +91,8 @@ export default function Home() {
             </div>
 
             <div className="toolbar">
-                <UploadButton folderId={currentFolderId} onUploaded={loadContents} />
-                <NewFolderButton parentFolderId={currentFolderId} onCreated={loadContents} />
+                <UploadButton folderId={currentFolderId} onUploaded={loadContents} onUnauthorized={onLogout} />
+                <NewFolderButton parentFolderId={currentFolderId} onCreated={loadContents} onUnauthorized={onLogout} />
             </div>
 
             <div className="section-title">Folders</div>
@@ -96,7 +105,7 @@ export default function Home() {
             />
 
             <div className="section-title">Files</div>
-            <FileList files={files} onFileDeleted={loadContents} />
+            <FileList files={files} onFileDeleted={loadContents} onUnauthorized={onLogout} />
         </div>
     );
 }

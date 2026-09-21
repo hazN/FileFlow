@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using FileFlow.API.Data;
 using FileFlow.API.Models;
@@ -7,6 +8,7 @@ using FileFlow.API.Services;
 using Microsoft.AspNetCore.Builder;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Data.SqlTypes;
 
@@ -14,6 +16,7 @@ namespace FileFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class FilesController : ControllerBase
 {
     private readonly FileFlowDbContext _context;
@@ -41,7 +44,10 @@ public class FilesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<FileResponse>>> GetFiles()
     {
-        var files = await _context.FileItems.ToListAsync();
+        int userId = GetCurrentUserId();
+        var files = await _context.FileItems
+            .Where(file => file.UserId == userId)
+            .ToListAsync();
 
         // Convert the database entries into the response
         var response = files.Select(file => FileResponse.FromEntity(file)).ToList();
@@ -59,7 +65,9 @@ public class FilesController : ControllerBase
             return BadRequest("Search cannot be empty.");
         }
 
-        var filesQuery = _context.FileItems.Where(f => f.Name.Contains(query));
+        int userId = GetCurrentUserId();
+        var filesQuery = _context.FileItems
+            .Where(file => file.UserId == userId && file.Name.Contains(query));
 
         filesQuery = sort switch
         {
@@ -90,6 +98,11 @@ public class FilesController : ControllerBase
             return NotFound();
         }
 
+        if (file.UserId != GetCurrentUserId())
+        {
+            return NotFound();
+        }
+
         return Ok(FileResponse.FromEntity(file));
     }
 
@@ -103,8 +116,7 @@ public class FilesController : ControllerBase
             return BadRequest("No file was uploaded.");
         }
 
-        // Temporary user ID since authentication isn't set up yet
-        int mockUserId = 1;
+        int userId = GetCurrentUserId();
 
         // Use random unique name because user file name may include characters like ../ that break the path
         string randomName = Path.GetFileNameWithoutExtension(Path.GetRandomFileName()); // Gets "hfgfwctf"
@@ -144,7 +156,7 @@ public class FilesController : ControllerBase
             generatedStoragePath,
             filePayload.ContentType,
             filePayload.Length,
-            mockUserId,
+            userId,
             request.FolderId
         );
 
@@ -162,6 +174,11 @@ public class FilesController : ControllerBase
         var file = await _context.FileItems.FindAsync(id);
 
         if (file == null)
+        {
+            return NotFound();
+        }
+
+        if (file.UserId != GetCurrentUserId())
         {
             return NotFound();
         }
@@ -188,6 +205,11 @@ public class FilesController : ControllerBase
             return NotFound();
         }
 
+        if (file.UserId != GetCurrentUserId())
+        {
+            return NotFound();
+        }
+
         string fullDiskPath = Path.Combine(_storagePath, file.StoredFileName);
 
         if (System.IO.File.Exists(fullDiskPath))
@@ -209,6 +231,11 @@ public class FilesController : ControllerBase
         var file = await _context.FileItems.FindAsync(id);
 
         if (file == null)
+        {
+            return NotFound();
+        }
+
+        if (file.UserId != GetCurrentUserId())
         {
             return NotFound();
         }
@@ -239,5 +266,17 @@ public class FilesController : ControllerBase
         await _context.SaveChangesAsync();
 
         return Ok(FileResponse.FromEntity(file));
+    }
+
+    private int GetCurrentUserId()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (userIdClaim == null)
+        {
+            throw new UnauthorizedAccessException("No user ID found in token.");
+        }
+
+        return int.Parse(userIdClaim);
     }
 }
