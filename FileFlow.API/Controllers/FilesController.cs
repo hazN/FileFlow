@@ -4,8 +4,10 @@ using Microsoft.EntityFrameworkCore;
 using FileFlow.API.Data;
 using FileFlow.API.Models;
 using FileFlow.API.DTOs;
+using FileFlow.API.Options;
 using FileFlow.API.Services;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Options;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Claims;
@@ -20,6 +22,7 @@ namespace FileFlow.API.Controllers;
 public class FilesController : ControllerBase
 {
     private readonly FileFlowDbContext _context;
+    private readonly FileUploadOptions _uploadOptions;
 
     // Physical location of storage folder on disk
     private readonly string _storagePath;
@@ -27,10 +30,15 @@ public class FilesController : ControllerBase
     // Turns a FolderId into a real folder path
     private readonly FolderPathResolver _pathResolver;
 
-    public FilesController(FileFlowDbContext context, IWebHostEnvironment env, FolderPathResolver pathResolver)
+    public FilesController(
+        FileFlowDbContext context,
+        IWebHostEnvironment env,
+        FolderPathResolver pathResolver,
+        IOptions<FileUploadOptions> uploadOptions)
     {
         _context = context;
         _pathResolver = pathResolver;
+        _uploadOptions = uploadOptions.Value;
         _storagePath = Path.Combine(env.ContentRootPath, "Storage");
 
         if (!Directory.Exists(_storagePath))
@@ -109,11 +117,35 @@ public class FilesController : ControllerBase
     // POST /api/files/upload
     // Receives a folder destination and a file from the user
     [HttpPost("upload")]
+    [RequestSizeLimit(104857600)]
     public async Task<ActionResult<FileResponse>> UploadFile([FromForm] FileUploadRequest request, IFormFile filePayload)
     {
         if (filePayload == null || filePayload.Length == 0)
         {
             return BadRequest("No file was uploaded.");
+        }
+
+        if (filePayload.Length > _uploadOptions.MaxFileSizeBytes)
+        {
+            double maxMb = _uploadOptions.MaxFileSizeBytes / 1024.0 / 1024.0;
+            return BadRequest($"File exceeds the maximum allowed size of {maxMb:0.#} MB.");
+        }
+
+        string uploadExtension = Path.GetExtension(filePayload.FileName).ToLowerInvariant();
+
+        if (string.IsNullOrEmpty(uploadExtension) || !_uploadOptions.AllowedExtensions.Any(allowedExtension =>
+                string.Equals(allowedExtension, uploadExtension, StringComparison.OrdinalIgnoreCase)))
+        {
+            string allowed = string.Join(", ", _uploadOptions.AllowedExtensions);
+            return BadRequest($"File type '{uploadExtension}' is not allowed. Allowed types: {allowed}");
+        }
+
+        using (var fileStream = filePayload.OpenReadStream())
+        {
+            if (!FileSignatureValidator.IsValid(uploadExtension, fileStream))
+            {
+                return BadRequest($"The file contents do not match the '{uploadExtension}' file type.");
+            }
         }
 
         int userId = GetCurrentUserId();

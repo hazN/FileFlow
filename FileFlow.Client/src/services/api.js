@@ -11,13 +11,29 @@ function throwIfUnauthorized(response) {
     }
 }
 
+async function throwIfNotOk(response, fallbackMessage) {
+    if (response.ok) return;
+
+    const responseText = await response.text();
+    let message = responseText;
+
+    try {
+        const body = JSON.parse(responseText);
+        message = body.detail || body.title || body.message || responseText;
+    } catch {
+        // The API may return a plain-text validation message.
+    }
+
+    throw new Error(message || fallbackMessage);
+}
+
 // GET /api/files
 export async function getFiles() {
     const response = await fetch(`${BASE_URL}/files`, {
         headers: { ...getAuthHeaders() },
     });
     throwIfUnauthorized(response);
-    if (!response.ok) throw new Error("Failed to fetch files");
+    await throwIfNotOk(response, "Failed to fetch files");
     return response.json();
 }
 
@@ -27,7 +43,7 @@ export async function getFolders() {
         headers: { ...getAuthHeaders() },
     });
     throwIfUnauthorized(response);
-    if (!response.ok) throw new Error("Failed to fetch folders");
+    await throwIfNotOk(response, "Failed to fetch folders");
     return response.json();
 }
 
@@ -37,7 +53,7 @@ export async function getFolderContents(folderId) {
         headers: { ...getAuthHeaders() },
     });
     throwIfUnauthorized(response);
-    if (!response.ok) throw new Error("Failed to fetch folder contents");
+    await throwIfNotOk(response, "Failed to fetch folder contents");
     return response.json();
 }
 
@@ -56,7 +72,7 @@ export async function uploadFile(file, folderId = null) {
     });
 
     throwIfUnauthorized(response);
-    if (!response.ok) throw new Error("Upload failed");
+    await throwIfNotOk(response, "Upload failed");
     return response.json();
 }
 
@@ -66,7 +82,7 @@ export async function downloadFile(id, fileName) {
         headers: { ...getAuthHeaders() },
     });
     throwIfUnauthorized(response);
-    if (!response.ok) throw new Error("Download failed");
+    await throwIfNotOk(response, "Download failed");
 
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
@@ -87,7 +103,7 @@ export async function deleteFile(id) {
         headers: { ...getAuthHeaders() },
     });
     throwIfUnauthorized(response);
-    if (!response.ok) throw new Error("Delete failed");
+    await throwIfNotOk(response, "Delete failed");
 }
 
 // POST /api/folders
@@ -101,7 +117,7 @@ export async function createFolder(name, parentFolderId = null) {
         body: JSON.stringify({ name, parentFolderId }),
     });
     throwIfUnauthorized(response);
-    if (!response.ok) throw new Error("Failed to create folder");
+    await throwIfNotOk(response, "Failed to create folder");
     return response.json();
 }
 
@@ -111,7 +127,7 @@ export async function searchFiles(query) {
         headers: { ...getAuthHeaders() },
     });
     throwIfUnauthorized(response);
-    if (!response.ok) throw new Error("Search failed");
+    await throwIfNotOk(response, "Search failed");
     return response.json();
 }
 
@@ -128,10 +144,7 @@ export async function register(email, password) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
     });
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || "Registration failed");
-    }
+    await throwIfNotOk(response, "Registration failed");
     return response.json(); // { token, email }
 }
 
@@ -142,9 +155,6 @@ export async function login(email, password) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
     });
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || "Login failed");
-    }
+    await throwIfNotOk(response, "Login failed");
     return response.json(); // { token, email }
 }
